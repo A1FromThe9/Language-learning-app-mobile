@@ -328,7 +328,7 @@ export function Settings() {
         </Card>
 
         <p className="pb-4 text-center text-xs text-muted">
-          Lexa stores everything locally. No account, no tracking. · tangerine
+          Lexa stores everything locally. No account, no tracking.
         </p>
       </div>
     </div>

@@ -15,17 +15,17 @@ export function Layout() {
   const immersive = pathname.startsWith('/review')
 
   return (
-    <div className="mx-auto flex min-h-[100svh] w-full max-w-md flex-col bg-bg">
+    <div className="mx-auto flex h-[100svh] w-full max-w-md flex-col overflow-hidden bg-bg">
       <main
-        className="flex-1 px-5 pt-[max(1.25rem,env(safe-area-inset-top))]"
-        style={{ paddingBottom: immersive ? 0 : 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+        className="flex-1 overflow-y-auto px-5 pb-6 pt-[max(1.25rem,env(safe-area-inset-top))]"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <Outlet />
       </main>
 
       {immersive ? null : (
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md border-t border-border bg-surface/90 backdrop-blur"
+          className="shrink-0 border-t border-border bg-surface"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <ul className="grid grid-cols-4">
