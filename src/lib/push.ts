@@ -43,9 +43,13 @@ export async function unsubscribe(): Promise<void> {
 }
 
 export async function saveSubscription(sub: PushSubscription): Promise<void> {
-  await fetch('/api/subscribe', {
+  const res = await fetch('/api/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sub.toJSON()),
   })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Subscribe failed (${res.status}): ${text.slice(0, 200)}`)
+  }
 }
