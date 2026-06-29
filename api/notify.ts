@@ -1,38 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { Redis } from '@upstash/redis'
+import { loadSubs, saveSubs } from './_subs.js'
 import webpush from 'web-push'
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
-
-const KEY = 'push:subscriptions'
-type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
-
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL ?? 'admin@example.com'}`,
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-)
-
-const PAYLOAD = JSON.stringify({
-  title: 'Time to review',
-  body: 'Your daily vocabulary session is ready.',
-})
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const subs: Sub[] = (await redis.get<Sub[]>(KEY)) ?? []
+  const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } = process.env
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return res.status(500).json({ error: 'Missing VAPID env vars' })
+
+  webpush.setVapidDetails(`mailto:${VAPID_EMAIL ?? 'admin@example.com'}`, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+
+  const subs = await loadSubs()
   const results = await Promise.allSettled(
-    subs.map((sub) => webpush.sendNotification(sub as webpush.PushSubscription, PAYLOAD)),
+    subs.map((sub) =>
+      webpush.sendNotification(sub as webpush.PushSubscription, JSON.stringify({
+        title: 'Time to review',
+        body: 'Your daily vocabulary session is ready.',
+      })),
+    ),
   )
 
   const alive = subs.filter((_, i) => results[i].status === 'fulfilled')
-  if (alive.length !== subs.length) await redis.set(KEY, alive)
+  if (alive.length !== subs.length) await saveSubs(alive)
 
   res.status(200).json({ sent: alive.length, pruned: subs.length - alive.length })
 }
