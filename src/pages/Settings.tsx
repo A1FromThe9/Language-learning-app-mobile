@@ -37,6 +37,7 @@ export function Settings() {
 
   const handleNotifToggle = async () => {
     setNotifBusy(true)
+    setTestMsg('')
     try {
       if (notif === 'subscribed') {
         await unsubscribe()
@@ -47,6 +48,8 @@ export function Settings() {
         const sub = await subscribe()
         if (sub) { await saveSubscription(sub); setNotif('subscribed') }
       }
+    } catch (e) {
+      setTestMsg(e instanceof Error ? e.message : 'Something went wrong.')
     } finally {
       setNotifBusy(false)
     }

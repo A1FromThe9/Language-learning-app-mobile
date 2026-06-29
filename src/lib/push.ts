@@ -4,18 +4,27 @@ export function pushSupported(): boolean {
   return 'PushManager' in window && 'serviceWorker' in navigator
 }
 
+async function getReg(): Promise<ServiceWorkerRegistration | null> {
+  // serviceWorker.ready hangs if no SW is active; race with a timeout
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+  ])
+}
+
 export async function getSubscription(): Promise<PushSubscription | null> {
   if (!pushSupported()) return null
-  const reg = await navigator.serviceWorker.ready
+  const reg = await getReg()
+  if (!reg) return null
   return reg.pushManager.getSubscription()
 }
 
 export async function subscribe(): Promise<PushSubscription | null> {
   if (!pushSupported() || !PUBLIC_KEY) return null
-  const reg = await navigator.serviceWorker.ready
+  const reg = await getReg()
+  if (!reg) throw new Error('Service worker not ready. Close and reopen the app, then try again.')
   const existing = await reg.pushManager.getSubscription()
   if (existing) return existing
-  // Browsers accept the raw base64url VAPID public key as a string
   return reg.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: PUBLIC_KEY,
