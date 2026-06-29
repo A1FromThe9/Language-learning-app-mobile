@@ -1,29 +1,32 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
+import { Redis } from '@upstash/redis'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
+
+const KEY = 'push:subscriptions'
+type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
+
+async function load(): Promise<Sub[]> {
+  return (await redis.get<Sub[]>(KEY)) ?? []
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
-    const sub = req.body as { endpoint: string; keys?: object }
+    const sub = req.body as Sub
     if (!sub?.endpoint) return res.status(400).json({ error: 'Missing endpoint' })
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({ endpoint: sub.endpoint, subscription: sub }, { onConflict: 'endpoint' })
-    if (error) return res.status(500).json({ error: error.message })
+    const list = await load()
+    const deduped = list.filter((s) => s.endpoint !== sub.endpoint)
+    await redis.set(KEY, [...deduped, sub])
     return res.status(200).json({ ok: true })
   }
 
   if (req.method === 'DELETE') {
     const { endpoint } = req.body as { endpoint: string }
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('endpoint', endpoint)
-    if (error) return res.status(500).json({ error: error.message })
+    const list = await load()
+    await redis.set(KEY, list.filter((s) => s.endpoint !== endpoint))
     return res.status(200).json({ ok: true })
   }
 

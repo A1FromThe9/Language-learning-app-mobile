@@ -1,11 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
+import { Redis } from '@upstash/redis'
 import webpush from 'web-push'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
+
+const KEY = 'push:subscriptions'
+type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
 
 webpush.setVapidDetails(
   `mailto:${process.env.VAPID_EMAIL ?? 'admin@example.com'}`,
@@ -23,16 +26,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const { data: rows, error } = await supabase.from('push_subscriptions').select('endpoint, subscription')
-  if (error) return res.status(500).json({ error: error.message })
-
+  const subs: Sub[] = (await redis.get<Sub[]>(KEY)) ?? []
   const results = await Promise.allSettled(
-    (rows ?? []).map((row) => webpush.sendNotification(row.subscription as webpush.PushSubscription, PAYLOAD)),
+    subs.map((sub) => webpush.sendNotification(sub as webpush.PushSubscription, PAYLOAD)),
   )
 
-  // Prune dead subscriptions
-  const dead = (rows ?? []).filter((_, i) => results[i].status === 'rejected').map((r) => r.endpoint)
-  if (dead.length) await supabase.from('push_subscriptions').delete().in('endpoint', dead)
+  const alive = subs.filter((_, i) => results[i].status === 'fulfilled')
+  if (alive.length !== subs.length) await redis.set(KEY, alive)
 
-  res.status(200).json({ sent: results.filter((r) => r.status === 'fulfilled').length, pruned: dead.length })
+  res.status(200).json({ sent: alive.length, pruned: subs.length - alive.length })
 }
