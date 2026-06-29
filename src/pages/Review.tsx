@@ -11,10 +11,10 @@ import type { Grade } from 'ts-fsrs'
 type Phase = 'loading' | 'reviewing' | 'done' | 'empty'
 
 const ratingStyles: Record<string, string> = {
-  again: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
-  hard: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  good: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
-  easy: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  again: 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900',
+  hard: 'bg-neutral-400 text-white dark:bg-neutral-500 dark:text-white',
+  good: 'bg-neutral-200 text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100',
+  easy: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
 }
 
 export function Review() {

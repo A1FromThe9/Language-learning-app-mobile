@@ -6,49 +6,49 @@
    Light by default, dark via prefers-color-scheme. Off-black / off-white only.
 ---------------------------------------------------------------------------- */
 :root {
-  --bg: #f6f5f2;
-  --surface: #fffdfb;
-  --surface-2: #f1efea;
-  --fg: #1c1917;
-  --muted: #79716b;
-  --border: #e7e3dd;
-  --accent: #0f766e;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f3f3f3;
+  --fg: #0a0a0a;
+  --muted: #737373;
+  --border: #e5e5e5;
+  --accent: #0a0a0a;
   --accent-fg: #ffffff;
-  --accent-soft: #d6f3ee;
-  --accent-on-soft: #115e56;
-  --ring: #14b8a6;
+  --accent-soft: #f3f3f3;
+  --accent-on-soft: #0a0a0a;
+  --ring: #0a0a0a;
 }
 
 /* Dark palette: applied when the OS prefers dark (and the user hasn't pinned a
    mode), or when the user explicitly chooses dark in Settings. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #14110f;
-    --surface: #1f1b18;
-    --surface-2: #2a2521;
-    --fg: #f5f3f0;
-    --muted: #a8a29e;
-    --border: #322c28;
-    --accent: #2dd4bf;
-    --accent-fg: #04302b;
-    --accent-soft: #133b37;
-    --accent-on-soft: #5eead4;
-    --ring: #2dd4bf;
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-2: #1f1f1f;
+    --fg: #fafafa;
+    --muted: #737373;
+    --border: #2a2a2a;
+    --accent: #fafafa;
+    --accent-fg: #0a0a0a;
+    --accent-soft: #1f1f1f;
+    --accent-on-soft: #fafafa;
+    --ring: #fafafa;
   }
 }
 
 [data-theme='dark'] {
-  --bg: #14110f;
-  --surface: #1f1b18;
-  --surface-2: #2a2521;
-  --fg: #f5f3f0;
-  --muted: #a8a29e;
-  --border: #322c28;
-  --accent: #2dd4bf;
-  --accent-fg: #04302b;
-  --accent-soft: #133b37;
-  --accent-on-soft: #5eead4;
-  --ring: #2dd4bf;
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface-2: #1f1f1f;
+  --fg: #fafafa;
+  --muted: #737373;
+  --border: #2a2a2a;
+  --accent: #fafafa;
+  --accent-fg: #0a0a0a;
+  --accent-soft: #1f1f1f;
+  --accent-on-soft: #fafafa;
+  --ring: #fafafa;
 }
 
 @theme inline {
