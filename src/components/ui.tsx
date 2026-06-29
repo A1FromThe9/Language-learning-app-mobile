@@ -51,7 +51,6 @@ export function Card({
     <div
       className={[
         'rounded-[var(--radius-card)] bg-surface border border-border',
-        'shadow-sm shadow-black/[0.03]',
         className,
       ].join(' ')}
     >
