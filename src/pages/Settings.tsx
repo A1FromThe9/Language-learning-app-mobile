@@ -1,0 +1,260 @@
+import { useEffect, useRef, useState } from 'react'
+import { Button, Card, PageTitle } from '../components/ui'
+import {
+  clearAllData,
+  exportData,
+  getSettings,
+  importData,
+  saveSettings,
+  type Backup,
+} from '../db/repo'
+import type { Settings as SettingsModel, ThemePref } from '../db/types'
+import { applyTheme } from '../lib/theme'
+
+export function Settings() {
+  const [form, setForm] = useState<SettingsModel | null>(null)
+  const [showKey, setShowKey] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    getSettings().then(setForm)
+  }, [])
+
+  if (!form) return null
+
+  const update = (patch: Partial<SettingsModel>) =>
+    setForm((prev) => (prev ? { ...prev, ...patch } : prev))
+
+  const persist = async (patch: Partial<SettingsModel>) => {
+    await saveSettings(patch)
+    setSavedAt(Date.now())
+  }
+
+  const handleSave = async () => {
+    await persist({
+      deepseekApiKey: form.deepseekApiKey.trim(),
+      deepseekModel: form.deepseekModel.trim() || 'deepseek-chat',
+      dailyNewLimit: clampInt(form.dailyNewLimit, 0, 999),
+      dailyReviewLimit: clampInt(form.dailyReviewLimit, 0, 9999),
+      desiredRetention: form.desiredRetention,
+    })
+  }
+
+  const setTheme = (theme: ThemePref) => {
+    update({ theme })
+    applyTheme(theme)
+    persist({ theme })
+  }
+
+  const handleExport = async () => {
+    const data = await exportData()
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lexa-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImport = async (file: File) => {
+    setImportMsg('')
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as Backup
+      if (!parsed || !Array.isArray(parsed.words) || !Array.isArray(parsed.cards)) {
+        throw new Error('bad shape')
+      }
+      await importData(parsed, true)
+      setImportMsg(`Imported ${parsed.words.length} words.`)
+    } catch {
+      setImportMsg('That file does not look like a Lexa backup.')
+    }
+  }
+
+  return (
+    <div>
+      <PageTitle title="Settings" />
+
+      <div className="space-y-5">
+        <Card className="space-y-4 p-4">
+          <SectionTitle title="AI enrichment" />
+          <p className="text-sm text-muted">
+            Lexa uses DeepSeek to draft definitions and examples. Your key is stored
+            only on this device and sent straight to DeepSeek.
+          </p>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold">DeepSeek API key</span>
+            <div className="flex gap-2">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={form.deepseekApiKey}
+                onChange={(e) => update({ deepseekApiKey: e.target.value })}
+                placeholder="sk-..."
+                autoComplete="off"
+                className={inputClass}
+              />
+              <button
+                onClick={() => setShowKey((s) => !s)}
+                className="shrink-0 rounded-[var(--radius-btn)] bg-surface-2 px-3 text-sm font-medium text-muted"
+              >
+                {showKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold">Model</span>
+            <input
+              value={form.deepseekModel}
+              onChange={(e) => update({ deepseekModel: e.target.value })}
+              placeholder="deepseek-chat"
+              className={inputClass}
+            />
+          </label>
+        </Card>
+
+        <Card className="space-y-4 p-4">
+          <SectionTitle title="Study limits" />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold">New / day</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={form.dailyNewLimit}
+                onChange={(e) => update({ dailyNewLimit: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold">Reviews / day</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={form.dailyReviewLimit}
+                onChange={(e) => update({ dailyReviewLimit: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </label>
+          </div>
+          <label className="block">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-sm font-semibold">Target retention</span>
+              <span className="text-sm tabular-nums text-accent">
+                {Math.round(form.desiredRetention * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0.8}
+              max={0.97}
+              step={0.01}
+              value={form.desiredRetention}
+              onChange={(e) => update({ desiredRetention: Number(e.target.value) })}
+              className="w-full accent-[var(--accent)]"
+            />
+            <p className="mt-1 text-xs text-muted">
+              Higher means more reviews but stronger recall.
+            </p>
+          </label>
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <SectionTitle title="Appearance" />
+          <div className="grid grid-cols-3 gap-2">
+            {(['system', 'light', 'dark'] as ThemePref[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={[
+                  'rounded-[var(--radius-btn)] border py-2.5 text-sm font-semibold capitalize transition-colors',
+                  form.theme === t
+                    ? 'border-accent bg-accent-soft text-accent-on-soft'
+                    : 'border-border bg-surface text-fg',
+                ].join(' ')}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Button block onClick={handleSave}>
+          {savedAt ? 'Saved' : 'Save settings'}
+        </Button>
+
+        <Card className="space-y-3 p-4">
+          <SectionTitle title="Backup" />
+          <p className="text-sm text-muted">
+            Your words live in this browser. Export a file to keep them safe or move
+            to another device.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" block onClick={handleExport}>
+              Export
+            </Button>
+            <Button variant="ghost" block onClick={() => fileRef.current?.click()}>
+              Import
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleImport(f)
+                e.target.value = ''
+              }}
+            />
+          </div>
+          {importMsg ? <p className="text-sm text-accent">{importMsg}</p> : null}
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <SectionTitle title="Danger zone" />
+          {confirmClear ? (
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-sm">Erase all words, cards and history?</span>
+              <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  await clearAllData()
+                  setConfirmClear(false)
+                }}
+              >
+                Erase
+              </Button>
+            </div>
+          ) : (
+            <Button variant="danger" block onClick={() => setConfirmClear(true)}>
+              Erase all data
+            </Button>
+          )}
+        </Card>
+
+        <p className="pb-4 text-center text-xs text-muted">
+          Lexa stores everything locally. No account, no tracking.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+const inputClass =
+  'w-full rounded-[var(--radius-btn)] border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted focus:border-accent'
+
+function SectionTitle({ title }: { title: string }) {
+  return <h2 className="text-sm font-bold uppercase tracking-wide text-muted">{title}</h2>
+}
+
+function clampInt(n: number, min: number, max: number): number {
+  if (Number.isNaN(n)) return min
+  return Math.max(min, Math.min(max, Math.round(n)))
+}
