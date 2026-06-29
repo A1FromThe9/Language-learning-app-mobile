@@ -14,7 +14,6 @@ import { getSubscription, pushSupported, saveSubscription, subscribe, unsubscrib
 
 export function Settings() {
   const [form, setForm] = useState<SettingsModel | null>(null)
-  const [showKey, setShowKey] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [importMsg, setImportMsg] = useState('')
@@ -83,7 +82,6 @@ export function Settings() {
 
   const handleSave = async () => {
     await persist({
-      deepseekApiKey: form.deepseekApiKey.trim(),
       deepseekModel: form.deepseekModel.trim() || 'deepseek-chat',
       dailyNewLimit: clampInt(form.dailyNewLimit, 0, 999),
       dailyReviewLimit: clampInt(form.dailyReviewLimit, 0, 9999),
@@ -131,28 +129,8 @@ export function Settings() {
         <Card className="space-y-4 p-4">
           <SectionTitle title="AI enrichment" />
           <p className="text-sm text-muted">
-            Lexa uses DeepSeek to draft definitions and examples. Your key is stored
-            only on this device and sent straight to DeepSeek.
+            Lexa uses DeepSeek to draft definitions and examples. The API key is stored securely on the server.
           </p>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">DeepSeek API key</span>
-            <div className="flex gap-2">
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={form.deepseekApiKey}
-                onChange={(e) => update({ deepseekApiKey: e.target.value })}
-                placeholder="sk-..."
-                autoComplete="off"
-                className={inputClass}
-              />
-              <button
-                onClick={() => setShowKey((s) => !s)}
-                className="shrink-0 rounded-[var(--radius-btn)] bg-surface-2 px-3 text-sm font-medium text-muted"
-              >
-                {showKey ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Model</span>
             <input

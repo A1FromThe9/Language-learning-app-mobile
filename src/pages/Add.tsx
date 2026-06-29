@@ -66,7 +66,6 @@ export function Add() {
     try {
       const settings = await getSettings()
       const result = await enrichWord(term.trim(), {
-        apiKey: settings.deepseekApiKey,
         model: settings.deepseekModel,
       })
       setDefinition(result.definition)
