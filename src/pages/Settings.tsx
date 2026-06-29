@@ -57,8 +57,12 @@ export function Settings() {
     setNotifBusy(true)
     try {
       const res = await fetch('/api/test-notify', { method: 'POST' })
-      const data = (await res.json()) as { sent?: number; error?: string }
+      const text = await res.text()
+      let data: { sent?: number; error?: string } = {}
+      try { data = JSON.parse(text) } catch { setTestMsg(`Server error: ${text.slice(0, 120)}`); return }
       setTestMsg(res.ok ? `Sent to ${data.sent} device(s).` : (data.error ?? 'Failed.'))
+    } catch (e) {
+      setTestMsg(`Network error: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setNotifBusy(false)
     }
