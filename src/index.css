@@ -66,8 +66,8 @@
   --color-accent-on-soft: var(--accent-on-soft);
   --color-ring: var(--ring);
 
-  --radius-card: 0.625rem;
-  --radius-btn: 0.5rem;
+  --radius-card: 1.25rem;
+  --radius-btn: 0.875rem;
 }
 
 html {

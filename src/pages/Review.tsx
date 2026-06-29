@@ -132,7 +132,7 @@ export function Review() {
       {/* Card */}
       <div className="flex flex-1 flex-col justify-center py-6">
         <div key={card.id} className="animate-pop-in">
-          <p className="mb-3 text-center text-xs text-muted">
+          <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">
             {cardTypeLabel(card.type)}
           </p>
           <div className="rounded-[var(--radius-card)] border border-border bg-surface px-6 py-10 text-center">

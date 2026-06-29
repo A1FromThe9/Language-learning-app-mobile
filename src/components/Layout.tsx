@@ -34,16 +34,22 @@ export function Layout() {
                 <NavLink
                   to={to}
                   end={to === '/'}
-                  aria-label={label}
                   className={({ isActive }) =>
                     [
-                      'flex items-center justify-center py-4 transition-colors',
+                      'flex flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors',
                       isActive ? 'text-accent' : 'text-muted',
                     ].join(' ')
                   }
                 >
                   {({ isActive }) => (
-                    <Icon width={22} height={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                    <>
+                      <Icon
+                        width={22}
+                        height={22}
+                        strokeWidth={isActive ? 2.4 : 2}
+                      />
+                      {label}
+                    </>
                   )}
                 </NavLink>
               </li>

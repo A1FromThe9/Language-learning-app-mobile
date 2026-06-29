@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Button } from '../components/ui'
-import { PlusIcon } from '../components/icons'
+import { Button, Card, PageTitle } from '../components/ui'
+import { FlameIcon, PlusIcon, SparklesIcon } from '../components/icons'
 import { getSettings, getStats, queueCounts } from '../db/repo'
 
 export function Home() {
@@ -20,33 +20,56 @@ export function Home() {
   const nothingToReview = counts && totalDue === 0
 
   return (
-    <div className="flex flex-col pt-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Today</h1>
-      <p className="mt-0.5 text-sm text-muted">
-        {stats?.streak ?? 0} day streak · {stats?.reviewedToday ?? 0} reviewed
-      </p>
+    <div>
+      <PageTitle
+        title="Today"
+        subtitle="A few minutes of recall keeps words from slipping away."
+      />
 
-      <div className="mt-12 mb-8">
-        <p className="text-[5.5rem] font-extrabold tabular-nums leading-none tracking-tight text-fg">
-          {counts === undefined ? '—' : totalDue}
-        </p>
-        <p className="mt-2 text-sm text-muted">
-          {counts
-            ? nothingToReview
-              ? 'all caught up'
-              : `${counts.newCards} new · ${counts.due} review`
-            : 'loading…'}
-        </p>
+      <div className="mb-5 grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-muted">
+            <FlameIcon width={18} height={18} />
+            <span className="text-xs font-medium">Streak</span>
+          </div>
+          <p className="mt-2 text-3xl font-bold tabular-nums">
+            {stats?.streak ?? 0}
+            <span className="ml-1 text-sm font-medium text-muted">days</span>
+          </p>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-medium text-muted">Reviewed today</div>
+          <p className="mt-2 text-3xl font-bold tabular-nums">
+            {stats?.reviewedToday ?? 0}
+          </p>
+        </Card>
       </div>
 
-      <Button
-        block
-        disabled={!counts || totalDue === 0}
-        onClick={() => navigate('/review')}
-        className="mb-10"
-      >
-        {nothingToReview ? 'All caught up' : 'Start review'}
-      </Button>
+      <Card className="mb-5 overflow-hidden">
+        <div className="bg-accent-soft px-5 py-6">
+          <p className="text-sm font-medium text-accent-on-soft">Due now</p>
+          <p className="mt-1 text-4xl font-extrabold tabular-nums text-accent-on-soft">
+            {totalDue}
+            <span className="ml-2 text-base font-medium">
+              {totalDue === 1 ? 'card' : 'cards'}
+            </span>
+          </p>
+          {counts ? (
+            <p className="mt-1 text-xs text-accent-on-soft/80">
+              {counts.newCards} new · {counts.due} review
+            </p>
+          ) : null}
+        </div>
+        <div className="p-4">
+          <Button
+            block
+            disabled={!counts || totalDue === 0}
+            onClick={() => navigate('/review')}
+          >
+            {nothingToReview ? 'All caught up' : 'Start review'}
+          </Button>
+        </div>
+      </Card>
 
       <form
         className="flex gap-2"
@@ -55,19 +78,26 @@ export function Home() {
           const term = quick.trim()
           if (!term) return
           navigate(`/add?term=${encodeURIComponent(term)}`)
-          setQuick('')
         }}
       >
         <input
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
-          placeholder="Add a word…"
+          placeholder="Quick add a word..."
           className="min-w-0 flex-1 rounded-[var(--radius-btn)] border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted focus:border-accent"
         />
         <Button type="submit" variant="soft" aria-label="Add word">
           <PlusIcon width={20} height={20} />
         </Button>
       </form>
+
+      <button
+        onClick={() => navigate('/add')}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--radius-btn)] border border-dashed border-border py-3 text-sm font-medium text-muted active:scale-[0.99]"
+      >
+        <SparklesIcon width={18} height={18} />
+        Add a word with AI definitions
+      </button>
     </div>
   )
 }
