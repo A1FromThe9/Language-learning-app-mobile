@@ -127,22 +127,6 @@ export function Settings() {
 
       <div className="space-y-5">
         <Card className="space-y-4 p-4">
-          <SectionTitle title="AI enrichment" />
-          <p className="text-sm text-muted">
-            Lexa uses DeepSeek to draft definitions and examples. The API key is stored securely on the server.
-          </p>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">Model</span>
-            <input
-              value={form.deepseekModel}
-              onChange={(e) => update({ deepseekModel: e.target.value })}
-              placeholder="deepseek-chat"
-              className={inputClass}
-            />
-          </label>
-        </Card>
-
-        <Card className="space-y-4 p-4">
           <SectionTitle title="Study limits" />
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
