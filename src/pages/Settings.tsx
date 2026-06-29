@@ -223,41 +223,45 @@ export function Settings() {
           </div>
         </Card>
 
-        {notif !== 'unsupported' && (
-          <Card className="space-y-3 p-4">
-            <SectionTitle title="Notifications" />
-            {notif === 'denied' ? (
+        <Card className="space-y-3 p-4">
+          <SectionTitle title="Notifications" />
+          {notif === 'unsupported' ? (
+            <p className="text-sm text-muted">
+              To enable daily reminders, add this app to your home screen first: tap the Share
+              button in Safari, then "Add to Home Screen". Open the app from there and come back
+              here.
+            </p>
+          ) : notif === 'denied' ? (
+            <p className="text-sm text-muted">
+              Notifications are blocked. Go to iPhone Settings → Safari → Notifications and allow
+              this site.
+            </p>
+          ) : (
+            <>
               <p className="text-sm text-muted">
-                Notifications blocked. Enable them in your phone's Settings → Safari → Notifications.
+                Get a daily reminder at 8 am UTC when cards are due.
               </p>
-            ) : (
-              <>
-                <p className="text-sm text-muted">
-                  Get a daily reminder at 8 am UTC when cards are due. Only works when the app is
-                  installed to your home screen (iOS 16.4+).
-                </p>
-                <Button
-                  variant={notif === 'subscribed' ? 'ghost' : 'soft'}
-                  block
-                  onClick={handleNotifToggle}
-                  disabled={notifBusy || notif === 'checking'}
-                >
-                  {notifBusy
-                    ? 'Working…'
-                    : notif === 'subscribed'
-                      ? 'Turn off reminders'
-                      : 'Enable daily reminders'}
+              <Button
+                variant={notif === 'subscribed' ? 'ghost' : 'soft'}
+                block
+                onClick={handleNotifToggle}
+                disabled={notifBusy || notif === 'checking'}
+              >
+                {notifBusy
+                  ? 'Working…'
+                  : notif === 'subscribed'
+                    ? 'Turn off reminders'
+                    : 'Enable daily reminders'}
+              </Button>
+              {notif === 'subscribed' && (
+                <Button variant="ghost" block onClick={handleTestNotif} disabled={notifBusy}>
+                  Send test notification
                 </Button>
-                {notif === 'subscribed' && (
-                  <Button variant="ghost" block onClick={handleTestNotif} disabled={notifBusy}>
-                    Send test notification
-                  </Button>
-                )}
-                {testMsg && <p className="text-sm text-muted">{testMsg}</p>}
-              </>
-            )}
-          </Card>
-        )}
+              )}
+              {testMsg && <p className="text-sm text-muted">{testMsg}</p>}
+            </>
+          )}
+        </Card>
 
         <Button block onClick={handleSave}>
           {savedAt ? 'Saved' : 'Save settings'}
