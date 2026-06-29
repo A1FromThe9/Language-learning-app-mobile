@@ -10,14 +10,20 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
+      },
       includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Lexa - learn words that stick',
         short_name: 'Lexa',
         description:
           'Capture words you do not know yet and lock them into memory with spaced repetition and active recall.',
-        theme_color: '#0f766e',
-        background_color: '#fafaf9',
+        theme_color: '#0a0a0a',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -32,10 +38,6 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
-        navigateFallback: '/index.html',
       },
       devOptions: { enabled: false },
     }),

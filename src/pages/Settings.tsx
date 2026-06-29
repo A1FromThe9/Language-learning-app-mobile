@@ -10,6 +10,7 @@ import {
 } from '../db/repo'
 import type { Settings as SettingsModel, ThemePref } from '../db/types'
 import { applyTheme } from '../lib/theme'
+import { getSubscription, pushSupported, saveSubscription, subscribe, unsubscribe } from '../lib/push'
 
 export function Settings() {
   const [form, setForm] = useState<SettingsModel | null>(null)
@@ -19,9 +20,49 @@ export function Settings() {
   const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  type NotifState = 'checking' | 'unsupported' | 'subscribed' | 'unsubscribed' | 'denied'
+  const [notif, setNotif] = useState<NotifState>('checking')
+  const [notifBusy, setNotifBusy] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+
   useEffect(() => {
     getSettings().then(setForm)
   }, [])
+
+  useEffect(() => {
+    if (!pushSupported()) { setNotif('unsupported'); return }
+    if (Notification.permission === 'denied') { setNotif('denied'); return }
+    getSubscription().then((sub) => setNotif(sub ? 'subscribed' : 'unsubscribed'))
+  }, [])
+
+  const handleNotifToggle = async () => {
+    setNotifBusy(true)
+    try {
+      if (notif === 'subscribed') {
+        await unsubscribe()
+        setNotif('unsubscribed')
+      } else {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') { setNotif('denied'); return }
+        const sub = await subscribe()
+        if (sub) { await saveSubscription(sub); setNotif('subscribed') }
+      }
+    } finally {
+      setNotifBusy(false)
+    }
+  }
+
+  const handleTestNotif = async () => {
+    setTestMsg('')
+    setNotifBusy(true)
+    try {
+      const res = await fetch('/api/test-notify', { method: 'POST' })
+      const data = (await res.json()) as { sent?: number; error?: string }
+      setTestMsg(res.ok ? `Sent to ${data.sent} device(s).` : (data.error ?? 'Failed.'))
+    } finally {
+      setNotifBusy(false)
+    }
+  }
 
   if (!form) return null
 
@@ -181,6 +222,42 @@ export function Settings() {
             ))}
           </div>
         </Card>
+
+        {notif !== 'unsupported' && (
+          <Card className="space-y-3 p-4">
+            <SectionTitle title="Notifications" />
+            {notif === 'denied' ? (
+              <p className="text-sm text-muted">
+                Notifications blocked. Enable them in your phone's Settings → Safari → Notifications.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-muted">
+                  Get a daily reminder at 8 am UTC when cards are due. Only works when the app is
+                  installed to your home screen (iOS 16.4+).
+                </p>
+                <Button
+                  variant={notif === 'subscribed' ? 'ghost' : 'soft'}
+                  block
+                  onClick={handleNotifToggle}
+                  disabled={notifBusy || notif === 'checking'}
+                >
+                  {notifBusy
+                    ? 'Working…'
+                    : notif === 'subscribed'
+                      ? 'Turn off reminders'
+                      : 'Enable daily reminders'}
+                </Button>
+                {notif === 'subscribed' && (
+                  <Button variant="ghost" block onClick={handleTestNotif} disabled={notifBusy}>
+                    Send test notification
+                  </Button>
+                )}
+                {testMsg && <p className="text-sm text-muted">{testMsg}</p>}
+              </>
+            )}
+          </Card>
+        )}
 
         <Button block onClick={handleSave}>
           {savedAt ? 'Saved' : 'Save settings'}
