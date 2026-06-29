@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kv } from '@vercel/kv'
+import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-const KEY = 'push:subscriptions'
-type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
 
 webpush.setVapidDetails(
   `mailto:${process.env.VAPID_EMAIL ?? 'admin@example.com'}`,
@@ -14,18 +16,19 @@ webpush.setVapidDetails(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const subs: Sub[] = (await kv.get<Sub[]>(KEY)) ?? []
-  if (subs.length === 0) return res.status(400).json({ error: 'No subscriptions registered' })
+  const { data: rows, error } = await supabase.from('push_subscriptions').select('subscription')
+  if (error) return res.status(500).json({ error: error.message })
+  if (!rows?.length) return res.status(400).json({ error: 'No subscriptions registered' })
 
   const results = await Promise.allSettled(
-    subs.map((sub) =>
+    rows.map((row) =>
       webpush.sendNotification(
-        sub as webpush.PushSubscription,
+        row.subscription as webpush.PushSubscription,
         JSON.stringify({ title: 'Test notification', body: 'Push notifications are working!' }),
       ),
     ),
   )
 
   const sent = results.filter((r) => r.status === 'fulfilled').length
-  res.status(200).json({ sent, total: subs.length })
+  res.status(200).json({ sent, total: rows.length })
 }

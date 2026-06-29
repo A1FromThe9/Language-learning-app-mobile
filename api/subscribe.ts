@@ -1,28 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kv } from '@vercel/kv'
+import { createClient } from '@supabase/supabase-js'
 
-const KEY = 'push:subscriptions'
-
-type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
-
-async function load(): Promise<Sub[]> {
-  return (await kv.get<Sub[]>(KEY)) ?? []
-}
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
-    const sub = req.body as Sub
+    const sub = req.body as { endpoint: string; keys?: object }
     if (!sub?.endpoint) return res.status(400).json({ error: 'Missing endpoint' })
-    const list = await load()
-    const deduped = list.filter((s) => s.endpoint !== sub.endpoint)
-    await kv.set(KEY, [...deduped, sub])
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert({ endpoint: sub.endpoint, subscription: sub }, { onConflict: 'endpoint' })
+    if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ ok: true })
   }
 
   if (req.method === 'DELETE') {
     const { endpoint } = req.body as { endpoint: string }
-    const list = await load()
-    await kv.set(KEY, list.filter((s) => s.endpoint !== endpoint))
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+    if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ ok: true })
   }
 

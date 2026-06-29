@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kv } from '@vercel/kv'
+import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-const KEY = 'push:subscriptions'
-type Sub = { endpoint: string; keys?: { p256dh: string; auth: string } }
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
 
 webpush.setVapidDetails(
   `mailto:${process.env.VAPID_EMAIL ?? 'admin@example.com'}`,
@@ -17,19 +19,20 @@ const PAYLOAD = JSON.stringify({
 })
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const auth = req.headers.authorization
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const subs: Sub[] = (await kv.get<Sub[]>(KEY)) ?? []
+  const { data: rows, error } = await supabase.from('push_subscriptions').select('endpoint, subscription')
+  if (error) return res.status(500).json({ error: error.message })
+
   const results = await Promise.allSettled(
-    subs.map((sub) => webpush.sendNotification(sub as webpush.PushSubscription, PAYLOAD)),
+    (rows ?? []).map((row) => webpush.sendNotification(row.subscription as webpush.PushSubscription, PAYLOAD)),
   )
 
-  // Prune subscriptions that are gone (410 Gone / 404)
-  const alive = subs.filter((_, i) => results[i].status === 'fulfilled')
-  if (alive.length !== subs.length) await kv.set(KEY, alive)
+  // Prune dead subscriptions
+  const dead = (rows ?? []).filter((_, i) => results[i].status === 'rejected').map((r) => r.endpoint)
+  if (dead.length) await supabase.from('push_subscriptions').delete().in('endpoint', dead)
 
-  res.status(200).json({ sent: alive.length, pruned: subs.length - alive.length })
+  res.status(200).json({ sent: results.filter((r) => r.status === 'fulfilled').length, pruned: dead.length })
 }
