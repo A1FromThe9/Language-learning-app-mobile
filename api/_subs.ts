@@ -32,13 +32,13 @@ export async function loadSubs(): Promise<Sub[]> {
 
 export async function saveSubs(subs: Sub[]): Promise<void> {
   const { url, token } = getRedis()
-  const res = await fetch(`${url}/pipeline`, {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify([['SET', KEY, JSON.stringify(subs)]]),
+    body: JSON.stringify(['SET', KEY, JSON.stringify(subs)]),
   })
   if (!res.ok) {
     const text = await res.text()
