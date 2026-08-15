@@ -123,6 +123,10 @@ export async function getCardsForWord(wordId: string): Promise<Card[]> {
   return db.cards.where('wordId').equals(wordId).toArray()
 }
 
+export async function getWord(wordId: string): Promise<Word | undefined> {
+  return db.words.get(wordId)
+}
+
 /* -------------------------------------------------------------------------- */
 /* Review queue                                                                */
 /* -------------------------------------------------------------------------- */

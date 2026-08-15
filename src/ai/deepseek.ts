@@ -32,6 +32,36 @@ export async function enrichWord(
   return normalizeResult(data)
 }
 
+/** Fetch a single fresh AI-generated example sentence for a word (not cached). */
+export async function fetchExampleSentence(
+  term: string,
+  opts: { model?: string; language?: string; avoid?: string[]; signal?: AbortSignal },
+): Promise<string> {
+  let res: Response
+  try {
+    res = await fetch('/api/example-sentence', {
+      method: 'POST',
+      signal: opts.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ term, model: opts.model, language: opts.language, avoid: opts.avoid }),
+    })
+  } catch {
+    throw new DeepSeekError('Network error reaching the server. Check your connection.')
+  }
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    throw new DeepSeekError((data as { error?: string }).error ?? `Request failed (${res.status}).`)
+  }
+
+  const sentence = (data as { sentence?: unknown }).sentence
+  if (typeof sentence !== 'string' || !sentence.trim()) {
+    throw new DeepSeekError('The AI response was missing a sentence.')
+  }
+  return sentence.trim()
+}
+
 function normalizeResult(raw: unknown): EnrichResult {
   const obj = (raw ?? {}) as Record<string, unknown>
   const definition = typeof obj.definition === 'string' ? obj.definition.trim() : ''

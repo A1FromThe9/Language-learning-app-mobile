@@ -30,7 +30,7 @@ export function makeScheduler(desiredRetention: number) {
 }
 
 /** Replace the term inside an example sentence with a blank for cloze cards. */
-function makeCloze(sentence: string, term: string): string | null {
+export function makeCloze(sentence: string, term: string): string | null {
   const re = new RegExp(`\\b${escapeRegExp(term)}\\w*\\b`, 'i')
   if (!re.test(sentence)) return null
   return sentence.replace(re, '_____')

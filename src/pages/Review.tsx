@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui'
 import { ArrowLeftIcon, CheckIcon } from '../components/icons'
-import { buildSession, getSettings, submitReview } from '../db/repo'
-import { RATINGS, ratingIntervals } from '../srs/fsrs'
+import { buildSession, getSettings, getWord, submitReview } from '../db/repo'
+import { RATINGS, ratingIntervals, makeCloze } from '../srs/fsrs'
 import { gradeTyped, type GradeVerdict } from '../srs/grade'
 import { TYPED_CARD_TYPES, type Card as CardModel, type Settings } from '../db/types'
+import { fetchExampleSentence } from '../ai/deepseek'
 import type { Grade } from 'ts-fsrs'
 
 type Phase = 'loading' | 'reviewing' | 'done' | 'empty'
@@ -29,6 +30,9 @@ export function Review() {
   const [typed, setTyped] = useState('')
   const [verdict, setVerdict] = useState<GradeVerdict | null>(null)
 
+  const [freshPrompt, setFreshPrompt] = useState<string | null>(null)
+  const [sentenceFetching, setSentenceFetching] = useState(false)
+
   useEffect(() => {
     ;(async () => {
       const s = await getSettings()
@@ -41,6 +45,40 @@ export function Review() {
 
   const card = queue[index]
   const isTyped = card ? TYPED_CARD_TYPES.includes(card.type) : false
+  const displayPrompt = card && card.type === 'usage' ? freshPrompt ?? card.prompt : card?.prompt
+
+  // Usage cards get a freshly generated example sentence for every review
+  // instead of reusing the cloze baked in at card-creation time.
+  useEffect(() => {
+    setFreshPrompt(null)
+    if (!card || card.type !== 'usage') {
+      setSentenceFetching(false)
+      return
+    }
+    let cancelled = false
+    setSentenceFetching(true)
+    ;(async () => {
+      const word = await getWord(card.wordId)
+      if (!word) throw new Error('missing word')
+      const sentence = await fetchExampleSentence(word.term, {
+        model: settings?.deepseekModel,
+        language: word.language,
+        avoid: word.examples,
+      })
+      const cloze = makeCloze(sentence, word.term)
+      if (!cloze) throw new Error('unusable sentence')
+      if (!cancelled) setFreshPrompt(cloze)
+    })()
+      .catch(() => {
+        // Fall back to the cached prompt on any failure (offline, no API key, etc.)
+      })
+      .finally(() => {
+        if (!cancelled) setSentenceFetching(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [card?.id])
 
   const intervals = useMemo(
     () => (card && settings ? ratingIntervals(card, settings.desiredRetention) : null),
@@ -136,7 +174,10 @@ export function Review() {
             {cardTypeLabel(card.type)}
           </p>
           <div className="rounded-[var(--radius-card)] border border-border bg-surface px-6 py-10 text-center">
-            <p className="text-balance text-2xl font-bold leading-snug">{card.prompt}</p>
+            <p className="text-balance text-2xl font-bold leading-snug">{displayPrompt}</p>
+            {card.type === 'usage' && sentenceFetching ? (
+              <p className="mt-2 text-xs font-medium text-muted">Fetching a new sentence…</p>
+            ) : null}
 
             {isTyped && !revealed ? (
               <input
