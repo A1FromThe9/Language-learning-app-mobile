@@ -5,8 +5,8 @@ import { ArrowLeftIcon, CheckIcon } from '../components/icons'
 import { buildSession, getSettings, getWord, submitReview } from '../db/repo'
 import { RATINGS, ratingIntervals, makeCloze } from '../srs/fsrs'
 import { gradeTyped, type GradeVerdict } from '../srs/grade'
-import { TYPED_CARD_TYPES, type Card as CardModel, type Settings } from '../db/types'
-import { fetchExampleSentence } from '../ai/deepseek'
+import { AI_GRADED_CARD_TYPES, TYPED_CARD_TYPES, type Card as CardModel, type Settings } from '../db/types'
+import { checkSentence, fetchExampleSentence } from '../ai/deepseek'
 import type { Grade } from 'ts-fsrs'
 
 type Phase = 'loading' | 'reviewing' | 'done' | 'empty'
@@ -29,6 +29,8 @@ export function Review() {
   const [revealed, setRevealed] = useState(false)
   const [typed, setTyped] = useState('')
   const [verdict, setVerdict] = useState<GradeVerdict | null>(null)
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
 
   const [freshPrompt, setFreshPrompt] = useState<string | null>(null)
   const [sentenceFetching, setSentenceFetching] = useState(false)
@@ -45,6 +47,8 @@ export function Review() {
 
   const card = queue[index]
   const isTyped = card ? TYPED_CARD_TYPES.includes(card.type) : false
+  const isCompose = card ? AI_GRADED_CARD_TYPES.includes(card.type) : false
+  const needsInput = isTyped || isCompose
   const displayPrompt = card && card.type === 'usage' ? freshPrompt ?? card.prompt : card?.prompt
 
   // Usage cards get a freshly generated example sentence for every review
@@ -92,10 +96,31 @@ export function Review() {
     setRevealed(false)
     setTyped('')
     setVerdict(null)
+    setFeedback(null)
+    setChecking(false)
   }
 
-  const handleCheck = () => {
+  const handleCheck = async () => {
     if (!card) return
+    if (isCompose) {
+      setChecking(true)
+      setFeedback(null)
+      try {
+        const result = await checkSentence(card.answer, typed, {
+          definition: card.hint,
+          model: settings?.deepseekModel,
+        })
+        setVerdict(result.correct ? 'correct' : 'wrong')
+        setFeedback(result.feedback)
+      } catch {
+        setVerdict(null)
+        setFeedback('Could not check your sentence right now. Rate yourself honestly.')
+      } finally {
+        setChecking(false)
+        setRevealed(true)
+      }
+      return
+    }
     setVerdict(gradeTyped(typed, card.answer))
     setRevealed(true)
   }
@@ -179,15 +204,26 @@ export function Review() {
               <p className="mt-2 text-xs font-medium text-muted">Fetching a new sentence…</p>
             ) : null}
 
-            {isTyped && !revealed ? (
-              <input
-                autoFocus
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-                placeholder="Type your answer"
-                className="mt-6 w-full rounded-[var(--radius-btn)] border border-border bg-bg px-4 py-3 text-center text-lg outline-none focus:border-accent"
-              />
+            {needsInput && !revealed ? (
+              isCompose ? (
+                <textarea
+                  autoFocus
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  rows={3}
+                  placeholder="Write your own sentence using the word above"
+                  className="mt-6 w-full resize-none rounded-[var(--radius-btn)] border border-border bg-bg px-4 py-3 text-center text-lg outline-none focus:border-accent"
+                />
+              ) : (
+                <input
+                  autoFocus
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+                  placeholder="Type your answer"
+                  className="mt-6 w-full rounded-[var(--radius-btn)] border border-border bg-bg px-4 py-3 text-center text-lg outline-none focus:border-accent"
+                />
+              )
             ) : null}
 
             {revealed ? (
@@ -202,13 +238,30 @@ export function Review() {
                     {verdict === 'correct' ? 'Correct' : verdict === 'almost' ? 'Almost' : 'Not quite'}
                   </p>
                 ) : null}
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Answer
-                </p>
-                <p className="mt-1 text-xl font-bold text-accent">{card.answer}</p>
-                {card.hint ? (
-                  <p className="mt-3 text-sm leading-relaxed text-muted">{card.hint}</p>
-                ) : null}
+                {isCompose ? (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Your sentence
+                    </p>
+                    <p className="mt-1 text-lg font-semibold">{typed || '—'}</p>
+                    {feedback ? (
+                      <p className="mt-3 text-sm leading-relaxed text-muted">{feedback}</p>
+                    ) : null}
+                    {card.hint ? (
+                      <p className="mt-3 text-xs leading-relaxed text-muted opacity-80">{card.hint}</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Answer
+                    </p>
+                    <p className="mt-1 text-xl font-bold text-accent">{card.answer}</p>
+                    {card.hint ? (
+                      <p className="mt-3 text-sm leading-relaxed text-muted">{card.hint}</p>
+                    ) : null}
+                  </>
+                )}
               </div>
             ) : null}
           </div>
@@ -218,14 +271,14 @@ export function Review() {
       {/* Controls */}
       <div className="space-y-3">
         {!revealed ? (
-          isTyped ? (
+          needsInput ? (
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setRevealed(true)}>
+              <Button variant="ghost" onClick={() => setRevealed(true)} disabled={checking}>
                 Skip
               </Button>
-              <Button block onClick={handleCheck} disabled={!typed.trim()}>
+              <Button block onClick={handleCheck} disabled={!typed.trim() || checking}>
                 <CheckIcon width={20} height={20} />
-                Check
+                {checking ? 'Checking...' : 'Check'}
               </Button>
             </div>
           ) : (
@@ -269,6 +322,8 @@ function cardTypeLabel(type: CardModel['type']): string {
       return 'Type the word'
     case 'usage':
       return 'Fill in the blank'
+    case 'compose':
+      return 'Write a sentence'
   }
 }
 

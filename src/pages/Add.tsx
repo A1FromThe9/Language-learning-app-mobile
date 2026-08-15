@@ -12,6 +12,7 @@ const CARD_TYPES: { type: CardType; label: string; hint: string }[] = [
   { type: 'reverse', label: 'Reverse', hint: 'definition to word' },
   { type: 'typed', label: 'Typed recall', hint: 'type the word' },
   { type: 'usage', label: 'In a sentence', hint: 'fill the blank' },
+  { type: 'compose', label: 'Write it', hint: 'write your own sentence' },
 ]
 
 export function Add() {

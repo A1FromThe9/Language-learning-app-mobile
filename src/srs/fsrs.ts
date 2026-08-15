@@ -94,6 +94,14 @@ export function createCardsForWord(
           hint: word.definition,
         })
       }
+    } else if (type === 'compose') {
+      cards.push({
+        ...base(),
+        type,
+        prompt: word.term,
+        answer: word.term,
+        hint: word.definition,
+      })
     }
   }
   return cards

@@ -1,10 +1,13 @@
 import type { Card as FsrsCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs'
 
-/** The four flavours of card we generate per word. */
-export type CardType = 'meaning' | 'reverse' | 'typed' | 'usage'
+/** The flavours of card we generate per word. */
+export type CardType = 'meaning' | 'reverse' | 'typed' | 'usage' | 'compose'
 
-/** Cards that need keyboard input and are auto-graded. */
+/** Cards that need keyboard input and are graded by exact/fuzzy match. */
 export const TYPED_CARD_TYPES: CardType[] = ['typed', 'usage']
+
+/** Cards that need keyboard input and are graded by asking the AI to check the answer. */
+export const AI_GRADED_CARD_TYPES: CardType[] = ['compose']
 
 export interface Word {
   id: string
