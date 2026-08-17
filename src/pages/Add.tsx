@@ -13,6 +13,7 @@ const CARD_TYPES: { type: CardType; label: string; hint: string }[] = [
   { type: 'typed', label: 'Typed recall', hint: 'type the word' },
   { type: 'usage', label: 'In a sentence', hint: 'fill the blank' },
   { type: 'compose', label: 'Write it', hint: 'write your own sentence' },
+  { type: 'fit', label: 'Word fit', hint: 'pick the right sentence' },
 ]
 
 export function Add() {

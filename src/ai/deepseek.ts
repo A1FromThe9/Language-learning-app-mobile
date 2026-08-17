@@ -62,6 +62,50 @@ export async function fetchExampleSentence(
   return sentence.trim()
 }
 
+export interface FitQuizResult {
+  options: string[]
+  correctIndex: number
+  mode: 'fits' | 'not-fit'
+}
+
+/** Ask the AI for a 4-option "does the word fit?" multiple-choice quiz. */
+export async function fetchFitQuiz(
+  term: string,
+  mode: 'fits' | 'not-fit',
+  opts: { definition?: string; model?: string; language?: string; signal?: AbortSignal },
+): Promise<FitQuizResult> {
+  let res: Response
+  try {
+    res = await fetch('/api/fit-quiz', {
+      method: 'POST',
+      signal: opts.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        term,
+        mode,
+        definition: opts.definition,
+        model: opts.model,
+        language: opts.language,
+      }),
+    })
+  } catch {
+    throw new DeepSeekError('Network error reaching the server. Check your connection.')
+  }
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    throw new DeepSeekError((data as { error?: string }).error ?? `Request failed (${res.status}).`)
+  }
+
+  const obj = data as { options?: unknown; correctIndex?: unknown; mode?: unknown }
+  const options = Array.isArray(obj.options) ? obj.options.filter((o): o is string => typeof o === 'string') : []
+  if (options.length !== 4 || typeof obj.correctIndex !== 'number' || (obj.mode !== 'fits' && obj.mode !== 'not-fit')) {
+    throw new DeepSeekError('The AI response was malformed.')
+  }
+  return { options, correctIndex: obj.correctIndex, mode: obj.mode }
+}
+
 export interface SentenceCheckResult {
   correct: boolean
   feedback: string

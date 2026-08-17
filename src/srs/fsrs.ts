@@ -102,6 +102,16 @@ export function createCardsForWord(
         answer: word.term,
         hint: word.definition,
       })
+    } else if (type === 'fit') {
+      // Quiz options are generated fresh by AI at review time; this is just
+      // the baked-in identity of the card (see fetchFitQuiz in Review).
+      cards.push({
+        ...base(),
+        type,
+        prompt: word.term,
+        answer: word.term,
+        hint: word.definition,
+      })
     }
   }
   return cards

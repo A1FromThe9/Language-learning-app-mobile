@@ -5,8 +5,14 @@ import { ArrowLeftIcon, CheckIcon } from '../components/icons'
 import { buildSession, getSettings, getWord, submitReview } from '../db/repo'
 import { RATINGS, ratingIntervals, makeCloze } from '../srs/fsrs'
 import { gradeTyped, type GradeVerdict } from '../srs/grade'
-import { AI_GRADED_CARD_TYPES, TYPED_CARD_TYPES, type Card as CardModel, type Settings } from '../db/types'
-import { checkSentence, fetchExampleSentence } from '../ai/deepseek'
+import {
+  AI_GRADED_CARD_TYPES,
+  MULTIPLE_CHOICE_CARD_TYPES,
+  TYPED_CARD_TYPES,
+  type Card as CardModel,
+  type Settings,
+} from '../db/types'
+import { checkSentence, fetchExampleSentence, fetchFitQuiz, type FitQuizResult } from '../ai/deepseek'
 import type { Grade } from 'ts-fsrs'
 
 type Phase = 'loading' | 'reviewing' | 'done' | 'empty'
@@ -35,6 +41,11 @@ export function Review() {
   const [freshPrompt, setFreshPrompt] = useState<string | null>(null)
   const [sentenceFetching, setSentenceFetching] = useState(false)
 
+  const [quiz, setQuiz] = useState<FitQuizResult | null>(null)
+  const [quizLoading, setQuizLoading] = useState(false)
+  const [quizError, setQuizError] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
   useEffect(() => {
     ;(async () => {
       const s = await getSettings()
@@ -48,6 +59,7 @@ export function Review() {
   const card = queue[index]
   const isTyped = card ? TYPED_CARD_TYPES.includes(card.type) : false
   const isCompose = card ? AI_GRADED_CARD_TYPES.includes(card.type) : false
+  const isChoice = card ? MULTIPLE_CHOICE_CARD_TYPES.includes(card.type) : false
   const needsInput = isTyped || isCompose
   const displayPrompt = card && card.type === 'usage' ? freshPrompt ?? card.prompt : card?.prompt
 
@@ -84,6 +96,40 @@ export function Review() {
     }
   }, [card?.id])
 
+  // Word-fit cards get a freshly AI-generated 4-option quiz for every review,
+  // alternating at random between "which one fits" and "which one doesn't".
+  useEffect(() => {
+    setQuiz(null)
+    setQuizError(false)
+    setSelectedIndex(null)
+    if (!card || card.type !== 'fit') {
+      setQuizLoading(false)
+      return
+    }
+    let cancelled = false
+    setQuizLoading(true)
+    ;(async () => {
+      const word = await getWord(card.wordId)
+      if (!word) throw new Error('missing word')
+      const mode = Math.random() < 0.5 ? 'fits' : 'not-fit'
+      const result = await fetchFitQuiz(word.term, mode, {
+        definition: word.definition,
+        model: settings?.deepseekModel,
+        language: word.language,
+      })
+      if (!cancelled) setQuiz(result)
+    })()
+      .catch(() => {
+        if (!cancelled) setQuizError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setQuizLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [card?.id])
+
   const intervals = useMemo(
     () => (card && settings ? ratingIntervals(card, settings.desiredRetention) : null),
     [card, settings],
@@ -98,6 +144,14 @@ export function Review() {
     setVerdict(null)
     setFeedback(null)
     setChecking(false)
+    setSelectedIndex(null)
+  }
+
+  const handleSelectOption = (i: number) => {
+    if (revealed || !quiz) return
+    setSelectedIndex(i)
+    setVerdict(i === quiz.correctIndex ? 'correct' : 'wrong')
+    setRevealed(true)
   }
 
   const handleCheck = async () => {
@@ -196,12 +250,34 @@ export function Review() {
       <div className="flex flex-1 flex-col justify-center py-6">
         <div key={card.id} className="animate-pop-in">
           <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">
-            {cardTypeLabel(card.type)}
+            {cardTypeLabel(card.type, quiz?.mode)}
           </p>
           <div className="rounded-[var(--radius-card)] border border-border bg-surface px-6 py-10 text-center">
             <p className="text-balance text-2xl font-bold leading-snug">{displayPrompt}</p>
             {card.type === 'usage' && sentenceFetching ? (
               <p className="mt-2 text-xs font-medium text-muted">Fetching a new sentence…</p>
+            ) : null}
+
+            {isChoice && !revealed ? (
+              quizLoading ? (
+                <p className="mt-6 text-sm font-medium text-muted">Generating quiz…</p>
+              ) : quizError || !quiz ? (
+                <p className="mt-6 text-sm font-medium text-muted">
+                  Could not generate the quiz right now. Skip and rate yourself honestly.
+                </p>
+              ) : (
+                <div className="mt-6 space-y-2 text-left">
+                  {quiz.options.map((option, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSelectOption(i)}
+                      className="w-full rounded-[var(--radius-btn)] border border-border bg-bg px-4 py-3 text-left text-sm font-medium transition-colors active:scale-[0.99] hover:border-accent"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )
             ) : null}
 
             {needsInput && !revealed ? (
@@ -238,7 +314,30 @@ export function Review() {
                     {verdict === 'correct' ? 'Correct' : verdict === 'almost' ? 'Almost' : 'Not quite'}
                   </p>
                 ) : null}
-                {isCompose ? (
+                {isChoice && quiz ? (
+                  <>
+                    <div className="space-y-2">
+                      {quiz.options.map((option, i) => (
+                        <p
+                          key={i}
+                          className={[
+                            'rounded-[var(--radius-btn)] border px-4 py-3 text-sm font-medium',
+                            i === quiz.correctIndex
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                              : i === selectedIndex
+                                ? 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                                : 'border-border text-muted',
+                          ].join(' ')}
+                        >
+                          {option}
+                        </p>
+                      ))}
+                    </div>
+                    {card.hint ? (
+                      <p className="mt-3 text-sm leading-relaxed text-muted">{card.hint}</p>
+                    ) : null}
+                  </>
+                ) : isCompose ? (
                   <>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                       Your sentence
@@ -281,6 +380,10 @@ export function Review() {
                 {checking ? 'Checking...' : 'Check'}
               </Button>
             </div>
+          ) : isChoice ? (
+            <Button variant="ghost" block onClick={() => setRevealed(true)} disabled={quizLoading}>
+              Skip
+            </Button>
           ) : (
             <Button block onClick={() => setRevealed(true)}>
               Show answer
@@ -312,7 +415,7 @@ export function Review() {
   )
 }
 
-function cardTypeLabel(type: CardModel['type']): string {
+function cardTypeLabel(type: CardModel['type'], quizMode?: 'fits' | 'not-fit'): string {
   switch (type) {
     case 'meaning':
       return 'What does this mean?'
@@ -324,6 +427,8 @@ function cardTypeLabel(type: CardModel['type']): string {
       return 'Fill in the blank'
     case 'compose':
       return 'Write a sentence'
+    case 'fit':
+      return quizMode === 'not-fit' ? "Which one doesn't fit?" : 'Which one fits?'
   }
 }
 
